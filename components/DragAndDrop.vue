@@ -9,24 +9,31 @@
         h1.title
           | ゲーミングヘッドセットおすすめランキング20選※記事タイトル
         .submit
-          button(@click="onSubmit" type="submit")
+          button(@click="onSubmit" type="submit" :class="{active: isActive}")
             | 変更を保存
-      div(v-if="selectedItems.length > 0")
-        | {{ selectedItems.length }}
-        | 件選択中
-      button(@click="insertMultipleItems(0)")
-        | ▲
-      button(@click="insertMultipleItems(items.length)")
-        | ▼
-      button(@click="selectAllItems")
-        | ぜん選択
-      button(@click="deleteSelectedItems")
-        | さくじょ
+      .header-button-group-outer
+        .header-button-group
+          .header-button-group-left
+            .checkbox(@click="selectAllItems" :class="currentStatus")
+              span
+            span(v-if="selectedItems.length > 0")
+              | {{ selectedItems.length }}
+              | 件選択中
+          .header-button-group-right
+            button(@click="insertMultipleItems(0)")
+              svg.icon.icon-top
+                use(xlink:href="/images/sprite.svg#top")
+            button(@click="insertMultipleItems(items.length)")
+              svg.icon.icon-bottom
+                use(xlink:href="/images/sprite.svg#bottom")
+            button.button-trash(@click="deleteSelectedItems")
+              svg.icon.icon-trash
+                use(xlink:href="/images/sprite.svg#trash")
 
     //img(src='/images/ic_content_copy_black_24dp_2x.png')
     .drag-and-drop
       ul#draggable(@dragover.prevent, @drop="onDrop")
-        transition-group(name="fade" duration="2400")
+        transition-group(name="fade" duration="400")
           li(v-for="(item, index) in items",
             :class="{ selected: item.selected }",
             :key="item.partsCode",
@@ -34,7 +41,7 @@
             @click="onSelected(index)",
             @dragstart="onDragStart",
             @dragend="onDragEnd(index)",
-            @dragleave="onMoved",
+            @dragover="onMoved",
             :data-index="index"
           )
             .button-group
@@ -55,7 +62,7 @@
                   use(xlink:href="/images/sprite.svg#trash")
             svg.icon.icon-grab
               use(xlink:href="/images/sprite.svg#grab")
-            .checkbox(:class="selectedItems.length > 1 ? 'multiple' : ''")
+            .checkbox(:class="{checked : item.selected}")
               span
             span.label
               | {{ item.type }}
@@ -128,13 +135,7 @@ let basicitems: Array<Item> = [{
   selected: false,
   type: '商品',
   image : '',
-}
-
-
-
-
-
-]
+}]
 
 interface HTMLElementEvent<T extends HTMLElement> extends Event {
   target: T;
@@ -157,6 +158,25 @@ export default class DragAndDrop extends Vue {
   selectedItems: Array<Item> = [];
   selectedIndex: number;
   targetIndex: number = 0;
+  originalPartsCodes: Array<Number> = [];
+
+  get isActive(): boolean {
+    const partsCodes = this.items.map(r => { return r.partsCode });
+    return this.originalPartsCodes.toString() !== partsCodes.toString();
+  }
+  
+  get currentStatus(): string {
+    if(this.selectedItems.length === this.items.length) {
+      return 'checked';
+    } else if(this.selectedItems.length > 0) {
+      return 'checked multiple';
+    }
+    return ''
+  }
+
+  mounted(): void {
+    this.originalPartsCodes = this.items.map(r => { return r.partsCode });
+  }
 
   onSelected(index): void {
     (event as Event).stopPropagation();
@@ -263,23 +283,25 @@ export default class DragAndDrop extends Vue {
   deleteItem(index): void {
     (event as Event).stopPropagation();
     this.items.splice(index, 1)
+    this.selectedItems = this.items.filter(r => { return r.selected })
   }
   selectAllItems(): void {
     let selectedCount: number = 0
     this.items.filter((r) => {
       if(r.selected === true) { selectedCount += 1 };
     });
-    if(this.items.length === selectedCount) {
-      this.items.map(r => { r.selected = false });
+    if(this.items.length === selectedCount || selectedCount === 0) {
+      this.items.map(r => { r.selected = !r.selected });
       this.selectedItems = this.items.filter(r => { return r.selected });
       return;
     }
-    this.items.map(r => { r.selected = true })
+    this.items.map(r => { r.selected = false })
     this.selectedItems = this.items.filter(r => { return r.selected });
   }
   deleteSelectedItems(): void {
     (event as Event).stopPropagation();
     this.items = this.items.filter(r => { return !r.selected })
+    this.resetSelection();
   }
   onSubmit(): void {
     const partsCodes: Array<Number> = this.items.map(r => { return r.partsCode })
@@ -331,37 +353,35 @@ export default class DragAndDrop extends Vue {
 
 }
 
-.button-group {
-  button {
-    appearance: none;
-    background: #f7f7f7;
-    border-radius: 2px;
-    border: none;
-    margin-right: 9px;
-    padding: 5px 13px;
-    
-    &:last-child {
-      margin-right: 0;
+button {
+  appearance: none;
+  background: #f7f7f7;
+  border-radius: 2px;
+  border: none;
+  margin-right: 9px;
+  padding: 5px 13px;
+  
+  &:last-child {
+    margin-right: 0;
+  }
+
+  &:hover {
+    background: #e7e7e7;
+
+    .icon {
+      fill: #999;
     }
+
+    .icon-trash {
+      fill: #fff;
+    }
+  }
+
+  &.button-trash {
+    background: #DA3D3D;
 
     &:hover {
-      background: #e7e7e7;
-
-      .icon {
-        fill: #999;
-      }
-
-      .icon-trash {
-        fill: #fff;
-      }
-    }
-
-    &.button-trash {
-      background: #DA3D3D;
-
-      &:hover {
-        background: #B91313;
-      }
+      background: #B91313;
     }
   }
 }
@@ -426,133 +446,127 @@ export default class DragAndDrop extends Vue {
   background-color: rgba(2, 187, 128, .1);
 }
 
-.drag-and-drop {
-  .checkbox {
+.checkbox {
+  display: inline-block;
+  color: #fff;
+  cursor: pointer;
+  position: relative;
+
+  span {
     display: inline-block;
-    color: #fff;
-    cursor: pointer;
     position: relative;
+    background-color: transparent;
+    width: 20px;
+    height: 20px;
+    transform-origin: center;
+    border: 2px solid #e7e7e7;
+    border-radius: 2px;
+    vertical-align: -6px;
+    margin-right: 10px;
+    //transition: background-color 100ms 100ms, transform 350ms cubic-bezier(.78,-1.22,.17,1.89);
 
-    span {
-      display: inline-block;
-      position: relative;
-      background-color: transparent;
-      width: 20px;
-      height: 20px;
-      transform-origin: center;
-      border: 2px solid #e7e7e7;
+    &:before {
+      content: "";
+      width: 0px;
+      height: 2px;
       border-radius: 2px;
-      vertical-align: -6px;
-      margin-right: 10px;
-      //transition: background-color 100ms 100ms, transform 350ms cubic-bezier(.78,-1.22,.17,1.89);
+      background: #fff;
+      position: absolute;
+      transform: rotate(45deg);
+      top: 9px;
+      left: 5px;
+      transition: width 50ms ease 50ms;
+      transform-origin: 0% 0%;
+    }
 
+    &:after {
+      content: "";
+      width: 0;
+      height: 2px;
+      border-radius: 2px;
+      background: #fff;
+      position: absolute;
+      transform: rotate(305deg);
+      top: 14px;
+      left: 7px;
+      transition: width 50ms ease;
+      transform-origin: 0% 0%;
+    }
+  }
+
+  &:hover {
+    span {
       &:before {
-        content: "";
-        width: 0px;
-        height: 2px;
-        border-radius: 2px;
-        background: #fff;
-        position: absolute;
-        transform: rotate(45deg);
-        top: 9px;
-        left: 5px;
-        transition: width 50ms ease 50ms;
-        transform-origin: 0% 0%;
+        width: 5px;
+        transition: width 100ms ease;
       }
 
       &:after {
-        content: "";
-        width: 0;
-        height: 2px;
-        border-radius: 2px;
-        background: #fff;
-        position: absolute;
-        transform: rotate(305deg);
-        top: 14px;
-        left: 7px;
-        transition: width 50ms ease;
-        transform-origin: 0% 0%;
-      }
-    }
-
-    &:hover {
-      span {
-        &:before {
-          width: 5px;
-          transition: width 100ms ease;
-        }
-
-        &:after {
-          width: 10px;
-          transition: width 150ms ease 100ms;
-        }
+        width: 10px;
+        transition: width 150ms ease 100ms;
       }
     }
   }
-}
-.drag-and-drop li {
 
-  &.selected {
-    .checkbox {
-      span {
-        border-color: #02BB80;
-        background-color: #02BB80;
-        transform: scale(1.05);
+  &.checked {
+    span {
+      border-color: #02BB80;
+      background-color: #02BB80;
+      transform: scale(1.05);
 
-        &:after {
-          width: 12px;
-          background: #fff;
-        }
+      &:after {
+        width: 12px;
+        background: #fff;
+      }
 
-        &:before {
-          width: 5px;
-          background: #fff;
-        }
+      &:before {
+        width: 5px;
+        background: #fff;
+      }
 
-        &:hover {
-          span {
-            background-color: #fff;
-            transform: scale(1.05);
+      &:hover {
+        span {
+          background-color: #fff;
+          transform: scale(1.05);
 
-            &:after {
-              width: 10px;
-              background: #1790b5;
-              transition: width 150ms ease 50ms;
-            }
+          &:after {
+            width: 10px;
+            background: #1790b5;
+            transition: width 150ms ease 50ms;
+          }
 
-            &:before {
-              width: 5px;
-              background: #1790b5;
-              transition: width 150ms ease 50ms;
-            }
+          &:before {
+            width: 5px;
+            background: #1790b5;
+            transition: width 150ms ease 50ms;
           }
         }
       }
     }
+  }
 
-    //.multiple {
-    //  &.checkbox {
-    //    span {
-    //      &:after {
-    //        transform: rotate(180deg);
-    //        top: 12px;
-    //        left: 16px;
-    //      }
-    //      &:before {
-    //        transform: rotate(180deg);
-    //        top: 12px;
-    //        left: 16px;
-    //      }
-    //    }
-    //  }
-    //}
+  &.multiple {
+    &.checkbox {
+      span {
+        &:after {
+          transform: rotate(180deg);
+          top: 12px;
+          left: 16px;
+        }
+        &:before {
+          transform: rotate(180deg);
+          top: 12px;
+          left: 16px;
+        }
+      }
+    }
   }
 }
+
 
 .header {
 
   .header-title {
-
     display: flex;
     justify-content: center;
     position: relative;
@@ -580,10 +594,38 @@ export default class DragAndDrop extends Vue {
         cursor: pointer;
         border-radius: 2px;
         background-color: transparent;
+
+        &.active {
+          background-color: #02BB80;
+          border-color: #02BB80;
+          color: #fff;
+        }
       }
     }
     color: #fff;
     background: #333;
+  }
+
+  .header-button-group-outer {
+    border-bottom: 1px solid #E7E7E7;
+  }
+  .header-button-group {
+    display: flex;
+    width: 1020px;
+    margin: 0 auto;
+    position: relative;
+    padding: 16px 0;
+    .header-button-group-left {
+      span {
+        color: #02BB80;
+        font-weight: bold;
+        font-size: 12px;
+      }
+    }
+    .header-button-group-right {
+      position: absolute;
+      right: 20px;
+    }
   }
 }
 
